@@ -61,3 +61,8 @@
   color: var(--color-text-muted);
   text-align: center;
 }
+
+.grid-overlay__hint--picking {
+  color: var(--color-primary);
+  font-weight: 600;
+}

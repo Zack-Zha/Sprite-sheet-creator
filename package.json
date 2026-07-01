@@ -6,8 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "preview": "vite preview",
-    "postinstall": "node scripts/copy-worker.js"
+    "preview": "vite preview"
   },
   "dependencies": {
     "gif.js.optimized": "^1.0.1",

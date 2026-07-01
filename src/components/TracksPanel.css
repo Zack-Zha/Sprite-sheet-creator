@@ -1,0 +1,130 @@
+.tracks-panel {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+
+.tracks-panel__title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 10px;
+}
+
+.tracks-panel__list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.tracks-panel__item {
+  padding: 10px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.tracks-panel__item:hover {
+  border-color: var(--color-text-muted);
+}
+
+.tracks-panel__item--active {
+  border-color: var(--color-primary);
+  background: rgba(31, 111, 235, 0.08);
+}
+
+.tracks-panel__item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.tracks-panel__item-state {
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 3px;
+}
+
+.tracks-panel__item-state--idle {
+  color: #3fb950;
+  background: rgba(63, 185, 80, 0.12);
+}
+
+.tracks-panel__item-state--walk {
+  color: #388bfd;
+  background: rgba(31, 111, 235, 0.12);
+}
+
+.tracks-panel__item-state--attack {
+  color: #e94560;
+  background: rgba(233, 69, 96, 0.12);
+}
+
+.tracks-panel__item-count {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+}
+
+.tracks-panel__item-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tracks-panel__fps-label {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+}
+
+.tracks-panel__fps-input {
+  width: 44px;
+  padding: 4px 4px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  font-size: 0.78rem;
+  text-align: center;
+  font-family: var(--font-mono);
+}
+
+.tracks-panel__fps-input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+.tracks-panel__btn {
+  padding: 4px 8px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+  font-size: 0.72rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color 0.2s, color 0.2s;
+}
+
+.tracks-panel__btn:hover:not(:disabled) {
+  border-color: var(--color-text-muted);
+  color: var(--color-text);
+}
+
+.tracks-panel__btn--clear:hover:not(:disabled) {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.tracks-panel__btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}

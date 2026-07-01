@@ -1,51 +1,57 @@
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useMemo } from 'react';
 import { useAnimation } from '../hooks/useAnimation';
-import type { AnimationGroup } from '../types';
+import type { CellState, AnimationTrack } from '../types';
 import './AnimationPreview.css';
 
 interface AnimationPreviewProps {
   frames: HTMLCanvasElement[];
-  fps: number;
-  groups?: AnimationGroup[];
-  activeGroup?: string | null;
+  tracks: Record<string, AnimationTrack>;
+  activeTrackId: CellState;
 }
 
-export function AnimationPreview({ frames, fps, groups = [], activeGroup = null }: AnimationPreviewProps) {
+export function AnimationPreview({ frames, tracks, activeTrackId }: AnimationPreviewProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  // Determine which frames to play
-  const group = activeGroup ? groups.find((g) => g.name === activeGroup) : null;
-  const activeFrames = group
-    ? group.frameIndices.map((i) => frames[i]).filter(Boolean)
-    : frames;
-  const activeFps = group?.fps ?? fps;
+  const activeTrack = tracks[activeTrackId];
+  const activeFps = activeTrack?.fps ?? 8;
+
+  // Stable activeFrames via useMemo — don't create new array every render
+  const activeFrames = useMemo(() => {
+    if (!activeTrack) return [];
+    return activeTrack.frameIndices
+      .map((i) => frames[i])
+      .filter(Boolean) as HTMLCanvasElement[];
+  }, [frames, activeTrack?.frameIndices]);
+
+  // Stable animationKey — only resets when track content actually changes
+  const animationKey = useMemo(() => {
+    if (!activeTrack) return 'empty';
+    return `${activeTrackId}:${activeTrack.frameIndices.join(',')}`;
+  }, [activeTrackId, activeTrack?.frameIndices]);
 
   const { isPlaying, togglePlay, currentFrame, totalFrames } = useAnimation(
-    canvasRef,
-    activeFrames,
-    activeFps
+    canvasRef, activeFrames, activeFps, animationKey
   );
 
   const hasFrames = activeFrames.length > 0;
   const canvasWidth = activeFrames[0]?.width ?? 0;
   const canvasHeight = activeFrames[0]?.height ?? 0;
 
-  // Scale canvas display
   const maxDisplayWidth = 500;
   const maxDisplayHeight = 400;
-  const scale = Math.min(
-    1,
+  const scale = Math.min(1,
     maxDisplayWidth / (canvasWidth || 1),
     maxDisplayHeight / (canvasHeight || 1)
   );
 
-  // Set canvas dimensions when frames change
   useEffect(() => {
     if (hasFrames && canvasRef.current) {
       canvasRef.current.width = canvasWidth;
       canvasRef.current.height = canvasHeight;
     }
   }, [hasFrames, canvasWidth, canvasHeight]);
+
+  const trackName = activeTrackId === 'idle' ? '待机' : activeTrackId === 'walk' ? '行走' : '攻击';
 
   return (
     <div className="animation-preview">
@@ -54,7 +60,7 @@ export function AnimationPreview({ frames, fps, groups = [], activeGroup = null 
         {hasFrames && (
           <span className="animation-preview__counter">
             第 {currentFrame + 1} 帧 / 共 {totalFrames} 帧
-            {group && <span className="animation-preview__group-badge">[{group.name}]</span>}
+            <span className="animation-preview__group-badge">[{trackName}]</span>
           </span>
         )}
       </h3>
@@ -75,9 +81,7 @@ export function AnimationPreview({ frames, fps, groups = [], activeGroup = null 
             <span className="animation-preview__empty-icon">🎬</span>
             <p>暂无帧可预览</p>
             <p className="animation-preview__empty-hint">
-              {groups.length > 0
-                ? '请选择一个动画分组来预览'
-                : '请上传精灵图并点击"开始切割"'}
+              请在网格中选择若干帧来预览 {trackName} 动画
             </p>
           </div>
         )}

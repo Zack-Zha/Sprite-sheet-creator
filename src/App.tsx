@@ -1,11 +1,9 @@
-import { useState } from 'react';
-import type { CellState } from './types';
 import { useSpriteProcessor } from './hooks/useSpriteProcessor';
 import { DropZone } from './components/DropZone';
 import { ParamForm } from './components/ParamForm';
-import { ThresholdSlider } from './components/ThresholdSlider';
+import { BackgroundRemovalPanel } from './components/BackgroundRemovalPanel';
 import { GridOverlay } from './components/GridOverlay';
-import { AnimationGroupManager } from './components/AnimationGroupManager';
+import { TracksPanel } from './components/TracksPanel';
 import { AnimationPreview } from './components/AnimationPreview';
 import { ExportPanel } from './components/ExportPanel';
 import './App.css';
@@ -21,33 +19,36 @@ function App() {
     scaledHeight,
     params,
     detectedScaleFactor,
-    bgThreshold,
+    bgOptions,
     bgEnabled,
     isProcessing,
     hasImage,
     hasFrames,
+    tracks,
+    activeTrackId,
     gridMap,
-    groups,
-    activeGroup,
+    isPickingBackground,
     setParams,
     handleFile,
     processFrames,
-    setBgThreshold,
+    setBgOptions,
     setBgEnabled,
+    setMagicWandSeed,
+    clearMagicWandSeed,
+    startPickingBackground,
     toggleCellState,
-    createGroup,
-    deleteGroup,
-    setActiveGroup,
+    setActiveTrackId,
+    updateTrackFps,
+    clearTrack,
+    sortTrackByGrid,
   } = useSpriteProcessor();
-
-  const [activeEditState, setActiveEditState] = useState<CellState>('idle');
 
   return (
     <div className="app">
       <header className="app__header">
         <h1 className="app__title">🎮 精灵图处理工具</h1>
         <p className="app__subtitle">
-          上传、缩放、切割、去背景、网格编辑、分组动画、导出
+          上传、缩放、切割、去背景、网格编辑、动画预览、导出
         </p>
       </header>
 
@@ -72,54 +73,57 @@ function App() {
             scaledHeight={scaledHeight}
           />
 
-          <ThresholdSlider
-            value={bgThreshold}
-            onChange={setBgThreshold}
+          <BackgroundRemovalPanel
+            options={bgOptions}
             enabled={bgEnabled}
+            isPicking={isPickingBackground}
+            onChange={setBgOptions}
             onToggle={setBgEnabled}
+            onStartPick={startPickingBackground}
+            onClearSeed={clearMagicWandSeed}
             hasFrames={hasFrames}
           />
 
-          {/* Grid editing state selector */}
+          {/* Track selector */}
           {hasFrames && (
             <div className="app__edit-mode">
-              <h3 className="app__edit-mode-title">编辑模式</h3>
+              <h3 className="app__edit-mode-title">编辑轨道</h3>
               <div className="app__edit-mode-buttons">
-                {([
-                  ['idle', '待机'],
-                  ['walk', '行走'],
-                  ['attack', '攻击'],
-                ] as [CellState, string][]).map(([state, label]) => (
-                  <button
-                    key={state}
-                    className={`app__edit-mode-btn app__edit-mode-btn--${state} ${activeEditState === state ? 'app__edit-mode-btn--active' : ''}`}
-                    onClick={() => setActiveEditState(state)}
-                  >
-                    {label}
-                  </button>
-                ))}
+                {(['idle', 'walk', 'attack'] as const).map((id) => {
+                  const label = id === 'idle' ? '待机' : id === 'walk' ? '行走' : '攻击';
+                  return (
+                    <button
+                      key={id}
+                      className={`app__edit-mode-btn app__edit-mode-btn--${id} ${activeTrackId === id ? 'app__edit-mode-btn--active' : ''}`}
+                      onClick={() => setActiveTrackId(id)}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
 
-          <AnimationGroupManager
-            groups={groups}
-            activeGroup={activeGroup}
-            onCreateGroup={createGroup}
-            onDeleteGroup={deleteGroup}
-            onSelectGroup={setActiveGroup}
-            hasGrid={hasFrames}
+          <TracksPanel
+            tracks={tracks}
+            activeTrackId={activeTrackId}
+            onSelectTrack={setActiveTrackId}
+            onUpdateFps={updateTrackFps}
+            onClearTrack={clearTrack}
+            onSortTrack={sortTrackByGrid}
+            hasFrames={hasFrames}
           />
 
           <ExportPanel
             frames={processedFrames}
             params={params}
-            groups={groups}
+            tracks={tracks}
+            activeTrackId={activeTrackId}
           />
         </aside>
 
         <main className="app__right">
-          {/* Grid overlay for editing */}
           {hasFrames && scaledImage && (
             <GridOverlay
               scaledImage={scaledImage}
@@ -128,16 +132,18 @@ function App() {
               frameWidth={params.frameWidth}
               frameHeight={params.frameHeight}
               gridMap={gridMap}
-              activeState={activeEditState}
+              tracks={tracks}
+              activeTrackId={activeTrackId}
               onToggleCell={toggleCellState}
+              isPickingBackground={isPickingBackground}
+              onPickBackground={setMagicWandSeed}
             />
           )}
 
           <AnimationPreview
             frames={processedFrames}
-            fps={params.fps}
-            groups={groups}
-            activeGroup={activeGroup}
+            tracks={tracks}
+            activeTrackId={activeTrackId}
           />
         </main>
       </div>

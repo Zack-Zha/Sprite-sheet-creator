@@ -13,6 +13,24 @@ export interface RGBColor {
   b: number;
 }
 
+export interface Point {
+  x: number;
+  y: number;
+}
+
+export type BackgroundRemovalMode = 'edge-connected' | 'magic-wand' | 'corner-threshold';
+
+export interface BackgroundRemovalOptions {
+  mode: BackgroundRemovalMode;
+  threshold: number;       // 0-100
+  hardAlpha: boolean;      // default true for pixel art
+  feather: boolean;        // default false
+  edgeCleanup: boolean;    // default true
+  seedPoint?: Point;
+  seedColor?: RGBColor;
+  alphaThreshold?: number; // default 16
+}
+
 export interface ProcessingState {
   originalImage: HTMLImageElement | null;
   rawFrames: HTMLCanvasElement[];
@@ -21,16 +39,14 @@ export interface ProcessingState {
   imageHeight: number;
 }
 
-/** Cell state tags for animation grouping */
+/** Cell state tags for animation tracks */
 export type CellState = 'idle' | 'walk' | 'attack';
 
-/** Grid map: "row_col" -> CellState */
-export type GridMap = Record<string, CellState | undefined>;
+export type AnimationTrackId = 'idle' | 'walk' | 'attack' | string;
 
-/** Animation group definition */
-export interface AnimationGroup {
+export interface AnimationTrack {
+  id: AnimationTrackId;
   name: string;
-  state: CellState;
   frameIndices: number[];
   fps: number;
 }

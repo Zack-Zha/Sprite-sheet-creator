@@ -1,13 +1,19 @@
-import { useState, useCallback, useRef } from 'react';
-import type { SpriteSheetParams, GridMap, AnimationGroup, CellState } from '../types';
+import { useState, useCallback, useRef, useMemo } from 'react';
+import type { SpriteSheetParams, CellState, AnimationTrack, BackgroundRemovalOptions } from '../types';
 import {
-  loadImage,
-  sliceFrames,
-  scaleCanvasNearestNeighbor,
-  autoDetectScaleFactor,
-  calculateGrid,
+  loadImage, sliceFrames, scaleCanvasNearestNeighbor,
+  autoDetectScaleFactor, calculateGrid,
 } from '../utils/canvas';
-import { detectBackgroundColor, removeBackground } from '../utils/background';
+import { applyBackgroundRemoval, getPixelColor } from '../utils/background';
+
+const DEFAULT_BG_OPTIONS: BackgroundRemovalOptions = {
+  mode: 'edge-connected',
+  threshold: 12,
+  hardAlpha: true,
+  feather: false,
+  edgeCleanup: true,
+  alphaThreshold: 16,
+};
 
 interface UseSpriteProcessorReturn {
   originalImage: HTMLImageElement | null;
@@ -20,28 +26,37 @@ interface UseSpriteProcessorReturn {
   scaledHeight: number;
   params: SpriteSheetParams;
   detectedScaleFactor: number;
-  bgThreshold: number;
+  bgOptions: BackgroundRemovalOptions;
   bgEnabled: boolean;
   isProcessing: boolean;
   hasImage: boolean;
   hasFrames: boolean;
-  gridMap: GridMap;
-  groups: AnimationGroup[];
-  activeGroup: string | null;
+  tracks: Record<string, AnimationTrack>;
+  activeTrackId: CellState;
+  gridMap: Record<string, CellState | undefined>;
+  isPickingBackground: boolean;
   // Actions
   setParams: (params: SpriteSheetParams) => void;
   handleFile: (file: File) => Promise<void>;
   processFrames: () => Promise<void>;
-  setBgThreshold: (value: number) => void;
+  setBgOptions: (options: BackgroundRemovalOptions) => void;
   setBgEnabled: (enabled: boolean) => void;
-  toggleCellState: (row: number, col: number, state: CellState) => void;
-  setCellState: (row: number, col: number, state: CellState | undefined) => void;
-  createGroup: (name: string, state: CellState, fps: number) => void;
-  deleteGroup: (name: string) => void;
-  setActiveGroup: (name: string | null) => void;
-  getGroupFrames: (groupName: string) => HTMLCanvasElement[];
-  getGroupFps: (groupName: string) => number;
+  setMagicWandSeed: (x: number, y: number) => void;
+  clearMagicWandSeed: () => void;
+  startPickingBackground: () => void;
+  cancelPickingBackground: () => void;
+  toggleCellState: (row: number, col: number) => void;
+  setActiveTrackId: (id: CellState) => void;
+  updateTrackFps: (trackId: string, fps: number) => void;
+  clearTrack: (trackId: string) => void;
+  sortTrackByGrid: (trackId: string) => void;
 }
+
+const DEFAULT_TRACKS: Record<string, AnimationTrack> = {
+  idle:   { id: 'idle',   name: '待机', frameIndices: [], fps: 8 },
+  walk:   { id: 'walk',   name: '行走', frameIndices: [], fps: 8 },
+  attack: { id: 'attack', name: '攻击', frameIndices: [], fps: 8 },
+};
 
 export function useSpriteProcessor(): UseSpriteProcessorReturn {
   const [originalImage, setOriginalImage] = useState<HTMLImageElement | null>(null);
@@ -54,43 +69,47 @@ export function useSpriteProcessor(): UseSpriteProcessorReturn {
   const [rawFrames, setRawFrames] = useState<HTMLCanvasElement[]>([]);
   const [processedFrames, setProcessedFrames] = useState<HTMLCanvasElement[]>([]);
   const [params, setParams] = useState<SpriteSheetParams>({
-    rows: 0,
-    cols: 0,
-    frameWidth: 32,
-    frameHeight: 32,
-    fps: 8,
-    scaleFactor: 'auto',
+    rows: 0, cols: 0, frameWidth: 32, frameHeight: 32, fps: 8, scaleFactor: 'auto',
   });
-  const [bgThreshold, setBgThresholdState] = useState(30);
+  const [bgOptions, setBgOptions] = useState<BackgroundRemovalOptions>({ ...DEFAULT_BG_OPTIONS });
   const [bgEnabled, setBgEnabledState] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [gridMap, setGridMap] = useState<GridMap>({});
-  const [groups, setGroups] = useState<AnimationGroup[]>([]);
-  const [activeGroup, setActiveGroup] = useState<string | null>(null);
+  const [isPickingBackground, setIsPickingBackground] = useState(false);
+
+  const [tracks, setTracks] = useState<Record<string, AnimationTrack>>({ ...DEFAULT_TRACKS });
+  const [activeTrackId, setActiveTrackId] = useState<CellState>('idle');
 
   const rawFramesRef = useRef<HTMLCanvasElement[]>([]);
-  const bgThresholdRef = useRef(30);
+  const bgOptionsRef = useRef<BackgroundRemovalOptions>({ ...DEFAULT_BG_OPTIONS });
   const bgEnabledRef = useRef(true);
   const imageRef = useRef<HTMLImageElement | null>(null);
   const scaledImageRef = useRef<HTMLCanvasElement | null>(null);
-  const gridMapRef = useRef<GridMap>({});
-  const groupsRef = useRef<AnimationGroup[]>([]);
+  const tracksRef = useRef<Record<string, AnimationTrack>>({ ...DEFAULT_TRACKS });
+  const activeTrackIdRef = useRef<CellState>('idle');
+  const paramsRef = useRef(params);
+  paramsRef.current = params;
 
   const hasImage = originalImage !== null;
   const hasFrames = processedFrames.length > 0;
 
-  // Apply background removal to raw frames
-  const applyBgRemoval = useCallback(
-    (frames: HTMLCanvasElement[], threshold: number): HTMLCanvasElement[] => {
+  const gridMap = useMemo(() => {
+    const map: Record<string, CellState | undefined> = {};
+    const cols = params.cols || 1;
+    for (const track of Object.values(tracks)) {
+      for (const idx of track.frameIndices) {
+        const row = Math.floor(idx / cols);
+        const col = idx % cols;
+        map[`${row}_${col}`] = track.id as CellState;
+      }
+    }
+    return map;
+  }, [tracks, params.cols]);
+
+  // Apply bg removal per frame with current options
+  const applyBg = useCallback(
+    (frames: HTMLCanvasElement[], opts: BackgroundRemovalOptions): HTMLCanvasElement[] => {
       if (frames.length === 0) return [];
-      const tmpCanvas = document.createElement('canvas');
-      tmpCanvas.width = frames[0].width;
-      tmpCanvas.height = frames[0].height;
-      const tmpCtx = tmpCanvas.getContext('2d')!;
-      tmpCtx.drawImage(frames[0], 0, 0);
-      const imageData = tmpCtx.getImageData(0, 0, tmpCanvas.width, tmpCanvas.height);
-      const bgColor = detectBackgroundColor(imageData);
-      return frames.map((frame) => removeBackground(frame, bgColor, threshold));
+      return frames.map((frame) => applyBackgroundRemoval(frame, opts));
     },
     []
   );
@@ -106,16 +125,16 @@ export function useSpriteProcessor(): UseSpriteProcessorReturn {
       setRawFrames([]);
       setProcessedFrames([]);
       setScaledImage(null);
-      setScaledWidth(0);
-      setScaledHeight(0);
+      setScaledWidth(0); setScaledHeight(0);
       setDetectedScaleFactor(1);
-      setGridMap({});
-      setGroups([]);
-      setActiveGroup(null);
       rawFramesRef.current = [];
-      gridMapRef.current = {};
-      groupsRef.current = [];
       scaledImageRef.current = null;
+      const fresh = { ...DEFAULT_TRACKS };
+      setTracks(fresh); tracksRef.current = fresh;
+      setActiveTrackId('idle'); activeTrackIdRef.current = 'idle';
+      // Reset bg options
+      const opts = { ...DEFAULT_BG_OPTIONS };
+      setBgOptions(opts); bgOptionsRef.current = opts;
     } catch (err) {
       console.error('图片加载失败：', err);
     } finally {
@@ -126,236 +145,185 @@ export function useSpriteProcessor(): UseSpriteProcessorReturn {
   const processFrames = useCallback(async () => {
     const img = imageRef.current;
     if (!img) return;
-
     setIsProcessing(true);
     try {
       await new Promise((r) => setTimeout(r, 50));
 
-      // Step 1: Determine scale factor
       let actualFactor: number;
       if (params.scaleFactor === 'auto') {
-        actualFactor = autoDetectScaleFactor(
-          img.naturalWidth,
-          img.naturalHeight,
-          params.frameWidth,
-          params.frameHeight
-        );
+        actualFactor = autoDetectScaleFactor(img.naturalWidth, img.naturalHeight, params.frameWidth, params.frameHeight);
       } else {
         actualFactor = params.scaleFactor;
       }
       setDetectedScaleFactor(actualFactor);
 
-      // Step 2: Scale the image (pixel-perfect nearest-neighbor)
       const scaled = scaleCanvasNearestNeighbor(img, actualFactor);
       scaledImageRef.current = scaled;
       setScaledImage(scaled);
-      setScaledWidth(scaled.width);
-      setScaledHeight(scaled.height);
+      setScaledWidth(scaled.width); setScaledHeight(scaled.height);
 
-      // Step 3: Auto-calculate grid dimensions
-      const { rows, cols } = calculateGrid(
-        scaled.width,
-        scaled.height,
-        params.frameWidth,
-        params.frameHeight
-      );
-
-      // Update params with auto-calculated rows/cols
+      const { rows, cols } = calculateGrid(scaled.width, scaled.height, params.frameWidth, params.frameHeight);
       const updatedParams = { ...params, rows, cols };
       setParams(updatedParams);
 
-      // Step 4: Slice frames from SCALED image
       const frames = sliceFrames(scaled, rows, cols, params.frameWidth, params.frameHeight);
       rawFramesRef.current = frames;
       setRawFrames(frames);
 
-      // Step 5: Background removal
       if (bgEnabledRef.current) {
-        const processed = applyBgRemoval(frames, bgThresholdRef.current);
-        setProcessedFrames(processed);
+        setProcessedFrames(applyBg(frames, bgOptionsRef.current));
       } else {
-        const cloned = frames.map((f) => {
+        setProcessedFrames(frames.map((f) => {
           const c = document.createElement('canvas');
-          c.width = f.width;
-          c.height = f.height;
+          c.width = f.width; c.height = f.height;
           c.getContext('2d')!.drawImage(f, 0, 0);
           return c;
-        });
-        setProcessedFrames(cloned);
+        }));
       }
 
-      // Initialize empty grid map
-      const newGridMap: GridMap = {};
-      setGridMap(newGridMap);
-      gridMapRef.current = newGridMap;
+      const fresh = { ...DEFAULT_TRACKS };
+      setTracks(fresh); tracksRef.current = fresh;
+      setActiveTrackId('idle'); activeTrackIdRef.current = 'idle';
     } catch (err) {
       console.error('处理失败：', err);
     } finally {
       setIsProcessing(false);
     }
-  }, [params, applyBgRemoval]);
+  }, [params, applyBg]);
 
-  const setBgThreshold = useCallback(
-    (value: number) => {
-      bgThresholdRef.current = value;
-      setBgThresholdState(value);
-      const frames = rawFramesRef.current;
-      if (frames.length > 0 && bgEnabledRef.current) {
-        const processed = applyBgRemoval(frames, value);
-        setProcessedFrames(processed);
-      }
-    },
-    [applyBgRemoval]
-  );
+  // Re-apply bg removal with new options (from raw frames)
+  const reprocessBg = useCallback((opts: BackgroundRemovalOptions) => {
+    const frames = rawFramesRef.current;
+    if (frames.length > 0 && bgEnabledRef.current) {
+      setProcessedFrames(applyBg(frames, opts));
+    }
+  }, [applyBg]);
 
-  const setBgEnabled = useCallback(
-    (enabled: boolean) => {
-      bgEnabledRef.current = enabled;
-      setBgEnabledState(enabled);
-      const frames = rawFramesRef.current;
-      if (frames.length > 0) {
-        if (enabled) {
-          const processed = applyBgRemoval(frames, bgThresholdRef.current);
-          setProcessedFrames(processed);
-        } else {
-          const cloned = frames.map((f) => {
-            const c = document.createElement('canvas');
-            c.width = f.width;
-            c.height = f.height;
-            c.getContext('2d')!.drawImage(f, 0, 0);
-            return c;
-          });
-          setProcessedFrames(cloned);
-        }
-      }
-    },
-    [applyBgRemoval]
-  );
+  const handleSetBgOptions = useCallback((opts: BackgroundRemovalOptions) => {
+    setBgOptions(opts);
+    bgOptionsRef.current = opts;
+    reprocessBg(opts);
+  }, [reprocessBg]);
 
-  // Grid cell state management
-  const toggleCellState = useCallback((row: number, col: number, state: CellState) => {
-    const key = `${row}_${col}`;
-    setGridMap((prev) => {
-      const current = prev[key];
-      const next = { ...prev };
-      if (current === state) {
-        delete next[key];
+  const handleSetBgEnabled = useCallback((enabled: boolean) => {
+    bgEnabledRef.current = enabled;
+    setBgEnabledState(enabled);
+    const frames = rawFramesRef.current;
+    if (frames.length > 0) {
+      if (enabled) {
+        setProcessedFrames(applyBg(frames, bgOptionsRef.current));
       } else {
-        next[key] = state;
+        setProcessedFrames(frames.map((f) => {
+          const c = document.createElement('canvas');
+          c.width = f.width; c.height = f.height;
+          c.getContext('2d')!.drawImage(f, 0, 0);
+          return c;
+        }));
       }
-      gridMapRef.current = next;
+    }
+  }, [applyBg]);
+
+  // Magic wand seed from scaled image coordinates
+  const setMagicWandSeed = useCallback((x: number, y: number) => {
+    const scaled = scaledImageRef.current;
+    if (!scaled) return;
+    const ctx = scaled.getContext('2d');
+    if (!ctx) return;
+    const imageData = ctx.getImageData(0, 0, scaled.width, scaled.height);
+    const color = getPixelColor(imageData, x, y, 16);
+    if (!color) return;
+
+    const newOpts: BackgroundRemovalOptions = {
+      ...bgOptionsRef.current,
+      mode: 'magic-wand',
+      seedPoint: { x, y },
+      seedColor: color,
+    };
+    setBgOptions(newOpts);
+    bgOptionsRef.current = newOpts;
+    setIsPickingBackground(false);
+    reprocessBg(newOpts);
+  }, [reprocessBg]);
+
+  const clearMagicWandSeed = useCallback(() => {
+    const newOpts: BackgroundRemovalOptions = {
+      ...bgOptionsRef.current,
+      mode: 'edge-connected',
+      seedPoint: undefined,
+      seedColor: undefined,
+    };
+    setBgOptions(newOpts);
+    bgOptionsRef.current = newOpts;
+    reprocessBg(newOpts);
+  }, [reprocessBg]);
+
+  const startPickingBackground = useCallback(() => setIsPickingBackground(true), []);
+  const cancelPickingBackground = useCallback(() => setIsPickingBackground(false), []);
+
+  // Track cell toggle
+  const toggleCellState = useCallback((row: number, col: number) => {
+    const cols = paramsRef.current.cols || 1;
+    const frameIndex = row * cols + col;
+    const trackId = activeTrackIdRef.current;
+    setTracks((prev) => {
+      const next: Record<string, AnimationTrack> = {};
+      for (const [id, t] of Object.entries(prev)) {
+        next[id] = { ...t, frameIndices: t.frameIndices.filter((i) => i !== frameIndex) };
+      }
+      const active = { ...next[trackId] };
+      const idx = active.frameIndices.indexOf(frameIndex);
+      if (idx >= 0) {
+        active.frameIndices = active.frameIndices.filter((_, i) => i !== idx);
+      } else {
+        active.frameIndices = [...active.frameIndices, frameIndex];
+      }
+      next[trackId] = active;
+      tracksRef.current = next;
       return next;
     });
   }, []);
 
-  const setCellState = useCallback((row: number, col: number, state: CellState | undefined) => {
-    const key = `${row}_${col}`;
-    setGridMap((prev) => {
-      const next = { ...prev };
-      if (state) {
-        next[key] = state;
-      } else {
-        delete next[key];
-      }
-      gridMapRef.current = next;
-      return next;
+  const handleSetActiveTrackId = useCallback((id: CellState) => {
+    setActiveTrackId(id); activeTrackIdRef.current = id;
+  }, []);
+
+  const updateTrackFps = useCallback((trackId: string, fps: number) => {
+    const safe = Math.min(60, Math.max(1, Number(fps) || 8));
+    setTracks((prev) => {
+      const next = { ...prev, [trackId]: { ...prev[trackId], fps: safe } };
+      tracksRef.current = next; return next;
     });
   }, []);
 
-  // Animation group management
-  const createGroup = useCallback(
-    (name: string, state: CellState, fps: number) => {
-      const gm = gridMapRef.current;
-      const indices: number[] = [];
-      const cols = params.cols || 1;
-
-      // Collect all cell indices matching the state
-      for (const [key, cellState] of Object.entries(gm)) {
-        if (cellState === state) {
-          const [r, c] = key.split('_').map(Number);
-          const index = r * cols + c;
-          indices.push(index);
-        }
-      }
-
-      if (indices.length === 0) return;
-
-      indices.sort((a, b) => a - b);
-
-      setGroups((prev) => {
-        const filtered = prev.filter((g) => g.name !== name);
-        const newGroup: AnimationGroup = {
-          name,
-          state,
-          frameIndices: indices,
-          fps,
-        };
-        const updated = [...filtered, newGroup];
-        groupsRef.current = updated;
-        return updated;
-      });
-    },
-    [params.cols]
-  );
-
-  const deleteGroup = useCallback((name: string) => {
-    setGroups((prev) => {
-      const updated = prev.filter((g) => g.name !== name);
-      groupsRef.current = updated;
-      return updated;
+  const clearTrack = useCallback((trackId: string) => {
+    setTracks((prev) => {
+      const next = { ...prev, [trackId]: { ...prev[trackId], frameIndices: [] } };
+      tracksRef.current = next; return next;
     });
-    setActiveGroup((prev) => (prev === name ? null : prev));
   }, []);
 
-  const getGroupFrames = useCallback(
-    (groupName: string): HTMLCanvasElement[] => {
-      const group = groupsRef.current.find((g) => g.name === groupName);
-      if (!group) return [];
-      return group.frameIndices
-        .map((i) => processedFrames[i])
-        .filter(Boolean);
-    },
-    [processedFrames]
-  );
-
-  const getGroupFps = useCallback(
-    (groupName: string): number => {
-      const group = groupsRef.current.find((g) => g.name === groupName);
-      return group?.fps ?? 8;
-    },
-    []
-  );
+  const sortTrackByGrid = useCallback((trackId: string) => {
+    setTracks((prev) => {
+      const track = prev[trackId];
+      if (!track) return prev;
+      const sorted = [...track.frameIndices].sort((a, b) => a - b);
+      const next = { ...prev, [trackId]: { ...track, frameIndices: sorted } };
+      tracksRef.current = next; return next;
+    });
+  }, []);
 
   return {
-    originalImage,
-    scaledImage,
-    rawFrames,
-    processedFrames,
-    imageWidth,
-    imageHeight,
-    scaledWidth,
-    scaledHeight,
-    params,
-    detectedScaleFactor,
-    bgThreshold,
-    bgEnabled,
-    isProcessing,
-    hasImage,
-    hasFrames,
-    gridMap,
-    groups,
-    activeGroup,
-    setParams,
-    handleFile,
-    processFrames,
-    setBgThreshold,
-    setBgEnabled,
-    toggleCellState,
-    setCellState,
-    createGroup,
-    deleteGroup,
-    setActiveGroup,
-    getGroupFrames,
-    getGroupFps,
+    originalImage, scaledImage, rawFrames, processedFrames,
+    imageWidth, imageHeight, scaledWidth, scaledHeight,
+    params, detectedScaleFactor, bgOptions, bgEnabled,
+    isProcessing, hasImage, hasFrames,
+    tracks, activeTrackId, gridMap,
+    isPickingBackground,
+    setParams, handleFile, processFrames,
+    setBgOptions: handleSetBgOptions, setBgEnabled: handleSetBgEnabled,
+    setMagicWandSeed, clearMagicWandSeed,
+    startPickingBackground, cancelPickingBackground,
+    toggleCellState, setActiveTrackId: handleSetActiveTrackId,
+    updateTrackFps, clearTrack, sortTrackByGrid,
   };
 }

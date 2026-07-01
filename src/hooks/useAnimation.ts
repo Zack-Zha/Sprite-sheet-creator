@@ -9,20 +9,38 @@ interface UseAnimationReturn {
 
 /**
  * FPS-controlled animation hook using requestAnimationFrame.
- * Uses time-based frame stepping with drift compensation for precise frame timing.
+ * - fpsRef avoids stale closure on fps changes
+ * - animationKey controls reset (only reset when track/frames actually change)
+ * - safeFps normalizes to [1..60]
  */
 export function useAnimation(
   canvasRef: React.RefObject<HTMLCanvasElement | null>,
   frames: HTMLCanvasElement[],
-  fps: number
+  fps: number,
+  animationKey?: string
 ): UseAnimationReturn {
   const [isPlaying, setIsPlaying] = useState(true);
   const [currentFrame, setCurrentFrame] = useState(0);
   const rafRef = useRef<number>(0);
   const lastFrameTimeRef = useRef<number>(0);
   const frameIndexRef = useRef<number>(0);
+  const fpsRef = useRef<number>(8);
 
   const totalFrames = frames.length;
+  const safeFps = Math.min(60, Math.max(1, Number(fps) || 8));
+
+  // Keep fpsRef in sync
+  useEffect(() => {
+    fpsRef.current = safeFps;
+  }, [safeFps]);
+
+  // Reset animation when animationKey changes (track/frames truly changed)
+  useEffect(() => {
+    frameIndexRef.current = 0;
+    setCurrentFrame(0);
+    setIsPlaying(true);
+    lastFrameTimeRef.current = 0;
+  }, [animationKey]);
 
   const drawFrame = useCallback(
     (index: number) => {
@@ -41,18 +59,10 @@ export function useAnimation(
     [canvasRef, frames]
   );
 
-  useEffect(() => {
-    // Reset when frames change
-    frameIndexRef.current = 0;
-    setCurrentFrame(0);
-    setIsPlaying(true);
-    lastFrameTimeRef.current = 0;
-  }, [frames]);
-
+  // Main animation loop
   useEffect(() => {
     if (!isPlaying || frames.length === 0) return;
 
-    // Set canvas dimensions from first frame
     const canvas = canvasRef.current;
     if (canvas && frames[0]) {
       canvas.width = frames[0].width;
@@ -60,7 +70,7 @@ export function useAnimation(
     }
 
     const tick = (now: number) => {
-      const frameDelay = 1000 / fps;
+      const frameDelay = 1000 / fpsRef.current;
 
       if (lastFrameTimeRef.current === 0) {
         lastFrameTimeRef.current = now;
@@ -69,7 +79,6 @@ export function useAnimation(
       const elapsed = now - lastFrameTimeRef.current;
 
       if (elapsed >= frameDelay) {
-        // Drift compensation: subtract excess time to keep average FPS correct
         lastFrameTimeRef.current = now - (elapsed % frameDelay);
 
         const nextIndex = (frameIndexRef.current + 1) % frames.length;
@@ -88,7 +97,7 @@ export function useAnimation(
         cancelAnimationFrame(rafRef.current);
       }
     };
-  }, [isPlaying, fps, frames, canvasRef, drawFrame]);
+  }, [isPlaying, frames, canvasRef, drawFrame]);
 
   // Draw initial frame
   useEffect(() => {

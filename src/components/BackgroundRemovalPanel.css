@@ -1,0 +1,226 @@
+.bg-panel {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+
+.bg-panel--disabled {
+  opacity: 0.6;
+}
+
+.bg-panel__header {
+  margin-bottom: 10px;
+}
+
+.bg-panel__toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.bg-panel__toggle input[type="checkbox"] {
+  width: 16px; height: 16px;
+  accent-color: var(--color-primary);
+  cursor: pointer;
+}
+
+.bg-panel__modes {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+
+.bg-panel__mode-btn {
+  flex: 1;
+  padding: 5px 6px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.bg-panel__mode-btn:hover:not(:disabled) {
+  border-color: var(--color-text-muted);
+}
+
+.bg-panel__mode-btn--active {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  background: rgba(31, 111, 235, 0.1);
+}
+
+.bg-panel__mode-btn:disabled {
+  opacity: 0.4; cursor: not-allowed;
+}
+
+.bg-panel__mode-desc {
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+  margin-bottom: 8px;
+  line-height: 1.4;
+}
+
+.bg-panel__mode-desc--warn {
+  color: var(--color-warning);
+}
+
+.bg-panel__control {
+  margin-bottom: 10px;
+}
+
+.bg-panel__label {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  display: block;
+  margin-bottom: 4px;
+}
+
+.bg-panel__threshold-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.bg-panel__range {
+  flex: 1;
+  height: 6px;
+  -webkit-appearance: none; appearance: none;
+  background: var(--color-border);
+  border-radius: 3px;
+  outline: none;
+}
+
+.bg-panel__range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  cursor: pointer;
+  border: 2px solid var(--color-bg);
+}
+
+.bg-panel__range:disabled {
+  opacity: 0.4;
+}
+
+.bg-panel__number {
+  width: 48px;
+  padding: 4px 4px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  font-size: 0.78rem;
+  text-align: center;
+  font-family: var(--font-mono);
+}
+
+.bg-panel__number:focus {
+  outline: none; border-color: var(--color-primary);
+}
+
+.bg-panel__unit {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+}
+
+.bg-panel__options {
+  display: flex;
+  gap: 14px;
+  margin-bottom: 10px;
+}
+
+.bg-panel__checkbox {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.bg-panel__checkbox input[type="checkbox"] {
+  width: 14px; height: 14px;
+  accent-color: var(--color-primary);
+}
+
+.bg-panel__feather-warn {
+  font-size: 0.7rem;
+  color: var(--color-warning);
+  margin-bottom: 8px;
+}
+
+.bg-panel__seed {
+  border-top: 1px solid var(--color-border);
+  padding-top: 10px;
+}
+
+.bg-panel__seed-btn {
+  padding: 8px 14px;
+  background: var(--color-primary);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.bg-panel__seed-btn:hover:not(:disabled) { background: var(--color-primary-hover); }
+.bg-panel__seed-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.bg-panel__seed-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.bg-panel__seed-swatch {
+  width: 20px; height: 20px;
+  border-radius: 3px;
+  border: 1px solid var(--color-border);
+}
+
+.bg-panel__seed-text {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+}
+
+.bg-panel__seed-clear {
+  background: none; border: none;
+  color: var(--color-accent);
+  font-size: 0.85rem;
+  cursor: pointer;
+  padding: 2px 6px;
+}
+
+.bg-panel__seed-cancel {
+  display: block;
+  margin-top: 6px;
+  background: none; border: none;
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.bg-panel__hint {
+  margin-top: 8px;
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+}
