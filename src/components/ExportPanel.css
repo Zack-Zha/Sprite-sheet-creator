@@ -1,0 +1,108 @@
+.export-panel {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+
+.export-panel__title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 12px;
+}
+
+.export-panel__buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.export-panel__btn {
+  flex: 1;
+  padding: 10px 12px;
+  border: none;
+  border-radius: var(--radius);
+  font-size: 0.85rem;
+  font-weight: 600;
+  transition: background 0.2s, opacity 0.2s;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.export-panel__btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.export-panel__btn--png {
+  background: var(--color-success);
+  color: #fff;
+}
+
+.export-panel__btn--png:hover:not(:disabled) {
+  background: #2ea043;
+}
+
+.export-panel__btn--gif {
+  background: var(--color-accent);
+  color: #fff;
+}
+
+.export-panel__btn--gif:hover:not(:disabled) {
+  background: var(--color-accent-hover);
+}
+
+.export-panel__progress {
+  margin-top: 10px;
+  height: 4px;
+  background: var(--color-bg);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.export-panel__progress-bar {
+  height: 100%;
+  background: var(--color-accent);
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+/* Per-group export */
+.export-panel__groups {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--color-border);
+}
+
+.export-panel__groups-title {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  margin-bottom: 8px;
+}
+
+.export-panel__btn--group {
+  display: block;
+  width: 100%;
+  margin-bottom: 4px;
+  padding: 8px 12px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  text-align: left;
+  font-size: 0.8rem;
+}
+
+.export-panel__btn--group:hover:not(:disabled) {
+  border-color: var(--color-primary);
+  background: rgba(31, 111, 235, 0.08);
+}
+
+.export-panel__hint {
+  margin-top: 8px;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  text-align: center;
+}

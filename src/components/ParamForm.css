@@ -1,0 +1,131 @@
+.param-form {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+
+.param-form__title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 12px;
+}
+
+.param-form__grid {
+  display: grid;
+  grid-template-columns: 1fr 80px;
+  gap: 8px 12px;
+  align-items: center;
+}
+
+.param-form__label {
+  font-size: 0.85rem;
+  color: var(--color-text);
+}
+
+.param-form__input {
+  width: 100%;
+  padding: 6px 8px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  font-size: 0.85rem;
+  text-align: right;
+  transition: border-color 0.2s;
+}
+
+.param-form__input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px rgba(31, 111, 235, 0.2);
+}
+
+.param-form__select {
+  font-family: var(--font-mono);
+  text-align: left;
+  cursor: pointer;
+}
+
+.param-form__warning {
+  margin-top: 10px;
+  padding: 6px 8px;
+  font-size: 0.78rem;
+  color: var(--color-warning);
+  background: rgba(210, 153, 29, 0.1);
+  border-radius: var(--radius-sm);
+}
+
+/* Info grid for auto-detected values */
+.param-form__info-grid {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 10px;
+  padding: 10px;
+  background: var(--color-bg);
+  border-radius: var(--radius-sm);
+  font-size: 0.78rem;
+}
+
+.param-form__info-label {
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.param-form__info-value {
+  color: var(--color-text);
+  font-family: var(--font-mono);
+}
+
+.param-form__button {
+  width: 100%;
+  margin-top: 14px;
+  padding: 10px 16px;
+  background: var(--color-primary);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius);
+  font-size: 0.9rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: background 0.2s;
+}
+
+.param-form__button:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+}
+
+.param-form__button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.param-form__spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.param-form__info {
+  margin-top: 8px;
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  text-align: center;
+}
