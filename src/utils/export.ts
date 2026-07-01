@@ -1,6 +1,54 @@
 import { combineFramesToGrid } from './canvas';
-// Vite ?url import — automatically bundles the worker as a static asset
+
+// ── Vite ?url imports — both main lib and worker as static assets ──
+// Avoids Vite's dynamic import pre-bundling which fails on gif.js.optimized
+import gifJsUrl from 'gif.js.optimized/dist/gif.js?url';
 import gifWorkerUrl from 'gif.js.optimized/dist/gif.worker.js?url';
+
+// ── Global type for window.GIF (set by UMD script tag) ────────────
+declare global {
+  interface Window {
+    GIF?: any;
+  }
+}
+
+/**
+ * Load the gif.js UMD bundle via <script> tag.
+ * Bypasses Vite's dynamic import pipeline entirely — no
+ * /node_modules/.vite/deps/gif__js__optimized.js request.
+ */
+async function loadGifJs(): Promise<any> {
+  if (window.GIF) return window.GIF;
+
+  await new Promise<void>((resolve, reject) => {
+    const existing = document.querySelector<HTMLScriptElement>('script[data-gif-js="true"]');
+    if (existing) {
+      existing.addEventListener('load', () => resolve(), { once: true });
+      existing.addEventListener(
+        'error',
+        () => reject(new Error(`GIF script 加载失败: ${gifJsUrl}`)),
+        { once: true }
+      );
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.src = gifJsUrl;
+    script.async = true;
+    script.dataset.gifJs = 'true';
+
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error(`GIF script 加载失败: ${gifJsUrl}`));
+
+    document.head.appendChild(script);
+  });
+
+  if (!window.GIF) {
+    throw new Error('gif.js 已加载但 window.GIF 不可用');
+  }
+
+  return window.GIF;
+}
 
 /** Export frames as a transparent PNG sprite sheet. */
 export function exportPng(
@@ -23,7 +71,8 @@ export function exportPng(
 
 /**
  * Export frames as an animated GIF using gif.js.optimized.
- * Worker is loaded via Vite ?url import — works in dev, preview, and production build.
+ * Main lib loaded via ?url + <script> tag → window.GIF.
+ * Worker loaded via ?url → static asset.
  */
 export async function exportGif(
   frames: HTMLCanvasElement[],
@@ -45,7 +94,6 @@ export async function exportGif(
   const safeFps = Math.min(60, Math.max(1, Number(fps) || 8));
   const delay = Math.max(20, Math.round(1000 / safeFps));
 
-  // Validate all frames have same size
   for (let i = 0; i < frames.length; i++) {
     if (frames[i].width !== width || frames[i].height !== height) {
       throw new Error(
@@ -54,25 +102,11 @@ export async function exportGif(
     }
   }
 
-  // ── Verify worker reachable ──────────────────────────────────
-  try {
-    const res = await fetch(gifWorkerUrl, { method: 'HEAD' });
-    if (!res.ok) {
-      throw new Error(`Worker 文件不可访问 (HTTP ${res.status}): ${gifWorkerUrl}`);
-    }
-  } catch (err) {
-    if (err instanceof Error && err.message.startsWith('Worker 文件不可访问')) throw err;
-    throw new Error(
-      `GIF Worker 加载失败: ${gifWorkerUrl}。${err instanceof Error ? err.message : String(err)}`
-    );
-  }
-
-  // ── Import GIF constructor (handle ESM/CJS interop) ──────────
-  const GIFModule = await import('gif.js.optimized');
-  const GIFCtor = (GIFModule as any).default ?? GIFModule;
+  // ── Load GIF constructor via UMD script tag ───────────────────
+  const GIFCtor = await loadGifJs();
 
   if (typeof GIFCtor !== 'function') {
-    throw new Error('gif.js.optimized 未正确导出 GIF 构造函数');
+    throw new Error('window.GIF 不是构造函数');
   }
 
   // ── Create encoder ───────────────────────────────────────────
